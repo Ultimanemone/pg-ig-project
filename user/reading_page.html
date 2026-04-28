@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Reading Page</title>
+	<link rel="stylesheet" href="style.css" />
+	<style>
+		.reading-shell {
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 16px;
+		}
+
+		.reading-card {
+			background: #fff;
+			border-radius: 10px;
+			padding: 18px;
+			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+		}
+
+		.reading-placeholder {
+			border: 1px dashed #bfc7d1;
+			border-radius: 8px;
+			padding: 18px;
+			line-height: 1.65;
+			color: #2f3a45;
+			background: #f9fbfd;
+			min-height: 260px;
+		}
+
+		.reading-actions {
+			display: flex;
+			gap: 10px;
+			flex-wrap: wrap;
+		}
+
+		.reading-actions button,
+		.reading-actions a {
+			border: none;
+			border-radius: 8px;
+			padding: 10px 14px;
+			cursor: pointer;
+			text-decoration: none;
+			display: inline-block;
+			font-weight: 600;
+		}
+
+		.btn-back {
+			background: #e9edf2;
+			color: #1f2d3d;
+		}
+
+		.btn-secondary {
+			background: #1f2d3d;
+			color: #fff;
+		}
+
+		.muted {
+			color: #66707a;
+			margin-top: 6px;
+		}
+	</style>
+</head>
+<body>
+	<div class="dashboard-layout">
+		<aside class="sidebar">
+			<h2 class="logo">Library User</h2>
+			<ul>
+				<li><a href="dashboard.html">Dashboard</a></li>
+				<li><a href="search_books.html">Search Books</a></li>
+				<li><a href="borrowing_history.html">My Borrowed Books</a></li>
+				<li><a href="profile.html">Profile</a></li>
+				<li><a href="settings.html">Settings</a></li>
+				<li><a href="logout.html">Logout</a></li>
+			</ul>
+		</aside>
+
+		<main class="main-content">
+			<div class="page-header">
+				<h1>Reading Page</h1>
+				<p data-auth-user>User</p>
+			</div>
+
+			<div class="reading-shell">
+				<section class="reading-card">
+					<h2 id="bookTitle">Loading your borrowed book...</h2>
+					<p id="bookMeta" class="muted"></p>
+					<div id="bookStatus" class="muted"></div>
+				</section>
+
+				<section class="reading-card">
+					<h3>Reader Placeholder</h3>
+					<div class="reading-placeholder">
+						This is a placeholder reading area.
+						<br /><br />
+						In a future version, this section can render chapter content, PDF/EPUB pages,
+						bookmarks, progress tracking, and annotations for the selected borrowed book.
+					</div>
+				</section>
+
+				<section class="reading-actions">
+					<button class="btn-back" id="goBackBtn" type="button">Back To Previous Page</button>
+					<a class="btn-secondary" href="borrowing_history.html">Go To Borrowing History</a>
+				</section>
+			</div>
+		</main>
+	</div>
+
+	<script src="../frontend/auth.js"></script>
+	<script src="../frontend/auth-guard.js"></script>
+	<script>
+		const API_BASE = 'http://localhost:3000/api';
+		const userId = AuthUtil.getUserId();
+		const selectedResId = Number(new URLSearchParams(window.location.search).get('res_id')) || null;
+
+		const titleEl = document.getElementById('bookTitle');
+		const metaEl = document.getElementById('bookMeta');
+		const statusEl = document.getElementById('bookStatus');
+		const goBackBtn = document.getElementById('goBackBtn');
+
+		goBackBtn.addEventListener('click', () => {
+			if (window.history.length > 1) {
+				window.history.back();
+			} else {
+				window.location.href = 'borrowing_history.html';
+			}
+		});
+
+		const formatDate = (value) => {
+			if (!value) return '-';
+			const d = new Date(value);
+			if (Number.isNaN(d.getTime())) return '-';
+			return d.toLocaleDateString('en-GB');
+		};
+
+		if (!userId) {
+			titleEl.textContent = 'No active session found';
+			metaEl.textContent = 'Please login again to view your borrowed books.';
+			statusEl.textContent = '';
+		} else {
+			fetch(`${API_BASE}/log/borrow?user_id=${encodeURIComponent(userId)}`, {
+				headers: AuthUtil.getAuthHeader()
+			})
+				.then((res) => res.json())
+				.then((payload) => {
+					const rows = (payload.data || []).filter((row) => row.status === 'Borrowed');
+
+					if (!rows.length) {
+						titleEl.textContent = 'No currently borrowed book';
+						metaEl.textContent = 'Borrow a book from Search Books to view it here.';
+						statusEl.textContent = '';
+						return;
+					}
+
+					rows.sort((a, b) => new Date(b.borrow_date) - new Date(a.borrow_date));
+
+					let current = rows[0];
+					if (selectedResId) {
+						const matched = rows.find((row) => Number(row.res_id) === selectedResId);
+						if (matched) {
+							current = matched;
+						}
+					}
+
+					titleEl.textContent = current.title || 'Untitled Book';
+					metaEl.textContent = `Author: ${current.author || 'Unknown'} | Borrowed: ${formatDate(current.borrow_date)}`;
+					statusEl.textContent = `Status: ${current.status} | Due: ${formatDate(current.return_date)}`;
+				})
+				.catch((error) => {
+					console.error('Failed to load current borrowed book:', error);
+					titleEl.textContent = 'Unable to load borrowed book';
+					metaEl.textContent = 'Please try again later.';
+					statusEl.textContent = '';
+				});
+		}
+	</script>
+</body>
+</html>

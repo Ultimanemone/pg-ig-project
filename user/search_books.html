@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search for materials</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="dashboard-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <h2 class="logo">Library User</h2>
+
+      <ul>
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a class="active" href="search_books.html">Search Books</a></li>
+        <li><a href="borrowing_history.html">My Borrowed Books</a></li>
+        <!-- <li><a href="borrowing_history.html">Borrowing History</a></li> -->
+        <li><a href="profile.html">Profile</a></li>
+        <li><a href="settings.html">Settings</a></li>
+        <li><a href="logout.html">Logout</a></li>
+      </ul>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1>Search Books</h1>
+        <p>User</p>
+      </div>
+
+      <!-- SEARCH BAR -->
+      <section class="search-panel">
+        <input id="searchInput" type="text" placeholder="Search by title, author, or keyword" />
+        
+        <select id="categorySelect">
+          <option value="">All Categories</option>
+        </select>
+
+        <button id="searchBtn" class="search-btn">Search</button>
+      </section>
+
+      <p id="recommendedHint">Recommended books are prioritized at the top based on your borrowing history.</p>
+
+      <!-- BOOK LIST -->
+      <section id="bookList" class="book-list"></section>
+    </main>
+  </div>
+
+  <script src="../frontend/auth.js"></script>
+  <script src="../frontend/auth-guard.js"></script>
+  <script>
+    const API_BASE = 'http://localhost:3000/api';
+    const searchInput = document.getElementById('searchInput');
+    const categorySelect = document.getElementById('categorySelect');
+    const searchBtn = document.getElementById('searchBtn');
+    const bookList = document.getElementById('bookList');
+    const recommendedHint = document.getElementById('recommendedHint');
+    const userId = AuthUtil.getUserId();
+    let allBooks = [];
+    let borrowRows = [];
+    let recommendationScores = {};
+    let activeBorrowedIds = new Set();
+
+    const dedupeBooks = (books) => {
+      const map = new Map();
+      books.forEach((book) => {
+        const key = book.res_id ?? `${book.title || ''}-${book.author || ''}`;
+        if (!map.has(key)) {
+          map.set(key, book);
+        }
+      });
+      return Array.from(map.values());
+    };
+
+    const createBookCard = (book) => {
+      const isBorrowedByCurrentUser = activeBorrowedIds.has(Number(book.res_id));
+      const card = document.createElement('div');
+      card.className = 'book-card';
+      card.innerHTML = `
+        <h3>${book.title || ''}</h3>
+        <p><strong>Author:</strong> ${book.author || ''}</p>
+        <p><strong>Category:</strong> ${book.category || 'Uncategorized'}</p>
+        <p><strong>Status:</strong> ${book.availability || 'Unknown'}</p>
+        ${book._score > 0 ? `<p><strong>Recommended:</strong> ${Math.round(book._weight * 100)}% category match</p>` : ''}
+        <div class="book-actions">
+          <button class="view-btn" disabled>View Details</button>
+          ${isBorrowedByCurrentUser ? `<button class="borrow-btn" data-open-id="${book.res_id}">Open</button>` : ''}
+          ${book.availability === 'Available' ? `<button class="borrow-btn" data-borrow-id="${book.res_id}">Borrow</button>` : ''}
+        </div>
+      `;
+      return card;
+    };
+
+    const renderBooks = (books) => {
+      bookList.innerHTML = '';
+      if (!books.length) {
+        bookList.innerHTML = '<p>No books found.</p>';
+        return;
+      }
+
+      books.forEach((book) => {
+        bookList.appendChild(createBookCard(book));
+      });
+    };
+
+    const buildRecommendationScores = () => {
+      recommendationScores = {};
+      const resourceById = new Map(allBooks.map((book) => [book.res_id, book]));
+      const categoryCounts = {};
+
+      borrowRows.forEach((row) => {
+        const category = resourceById.get(row.res_id)?.category;
+        if (!category) return;
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      });
+
+      const categories = Object.keys(categoryCounts);
+      if (!categories.length) {
+        recommendedHint.textContent = 'No borrowing history yet. Borrow a few books to get personalized recommendations.';
+        return;
+      }
+
+      const maxCount = Math.max(...Object.values(categoryCounts));
+      const topCategories = categories.filter((category) => categoryCounts[category] === maxCount);
+      const totalBorrows = Object.values(categoryCounts).reduce((sum, count) => sum + count, 0);
+
+      allBooks.forEach((book) => {
+        const count = categoryCounts[book.category] || 0;
+        recommendationScores[book.res_id] = {
+          score: count,
+          weight: totalBorrows ? count / totalBorrows : 0
+        };
+      });
+
+      recommendedHint.textContent = `Top category${topCategories.length > 1 ? 'ies' : ''}: ${topCategories.join(', ')}. Recommended books are pushed to the top of search results.`;
+    };
+
+    const loadBooks = () => Promise.all([
+      fetch(`${API_BASE}/`, { headers: AuthUtil.getAuthHeader() }).then((res) => res.json()),
+      fetch(`${API_BASE}/log/borrow?user_id=${encodeURIComponent(userId || '')}`, { headers: AuthUtil.getAuthHeader() }).then((res) => res.json())
+    ])
+      .then(([bookPayload, borrowPayload]) => {
+        allBooks = dedupeBooks(bookPayload.data || []);
+        borrowRows = borrowPayload.data || [];
+        activeBorrowedIds = new Set(
+          borrowRows
+            .filter((row) => row.status === 'Borrowed')
+            .map((row) => Number(row.res_id))
+        );
+        buildRecommendationScores();
+        categorySelect.innerHTML = '<option value="">All Categories</option>';
+        const categories = [...new Set(allBooks.map((b) => b.category).filter(Boolean))];
+        categories.forEach((cat) => {
+          const option = document.createElement('option');
+          option.value = cat;
+          option.textContent = cat;
+          categorySelect.appendChild(option);
+        });
+        applyFilters();
+      })
+      .catch((error) => {
+        console.error('Failed to load books/recommendations:', error);
+        bookList.innerHTML = '<p>Failed to load books.</p>';
+      });
+
+    const borrowBook = (resId) => {
+      if (!userId) {
+        alert('Missing user session. Please login again.');
+        return;
+      }
+
+      fetch(`${API_BASE}/borrow`, {
+        method: 'POST',
+        headers: AuthUtil.getAuthHeader(),
+        body: JSON.stringify({ user_id: Number(userId), res_id: Number(resId) })
+      })
+        .then((res) => res.json())
+        .then((payload) => {
+          if (!payload.success) {
+            alert(payload.error || payload.message || 'Failed to borrow book');
+            return;
+          }
+          alert('Book borrowed successfully');
+          loadBooks();
+        })
+        .catch((error) => {
+          console.error('Borrow request failed:', error);
+          alert('Borrow request failed');
+        });
+    };
+
+    const applyFilters = () => {
+      const keyword = searchInput.value.trim().toLowerCase();
+      const category = categorySelect.value;
+
+      const filtered = allBooks
+        .filter((book) => {
+          const matchesKeyword = !keyword
+            || (book.title || '').toLowerCase().includes(keyword)
+            || (book.author || '').toLowerCase().includes(keyword)
+            || (book.description || '').toLowerCase().includes(keyword);
+          const matchesCategory = !category || (book.category || '') === category;
+          return matchesKeyword && matchesCategory;
+        })
+        .map((book) => {
+          const rec = recommendationScores[book.res_id] || { score: 0, weight: 0 };
+          return {
+            ...book,
+            _score: rec.score,
+            _weight: rec.weight
+          };
+        })
+        .sort((a, b) => {
+          if (b._score !== a._score) return b._score - a._score;
+          if (a.availability !== b.availability) return a.availability === 'Available' ? -1 : 1;
+          return (a.title || '').localeCompare(b.title || '');
+        });
+
+      renderBooks(filtered);
+    };
+
+    loadBooks();
+
+    const handleBorrowClick = (event) => {
+      const openId = event.target.getAttribute('data-open-id');
+      if (openId) {
+        window.location.href = `reading_page.html?res_id=${encodeURIComponent(openId)}`;
+        return;
+      }
+
+      const resId = event.target.getAttribute('data-borrow-id');
+      if (resId) {
+        borrowBook(resId);
+      }
+    };
+
+    bookList.addEventListener('click', handleBorrowClick);
+
+    searchBtn.addEventListener('click', applyFilters);
+    searchInput.addEventListener('input', applyFilters);
+    categorySelect.addEventListener('change', applyFilters);
+  </script>
+</body>
+</html>

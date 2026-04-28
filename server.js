@@ -9,9 +9,9 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // ===================== IMPORT ROUTES =====================
-const userRoutes = require('./backend/user');
-const resourceRoutes = require('./backend/resource');
-const loggingRoutes = require('./backend/logging');
+const userRoutes = require('./backend/routes/user');
+const resourceRoutes = require('./backend/routes/resource');
+const loggingRoutes = require('./backend/routes/logging');
 
 // ===================== USE ROUTES =====================
 app.use('/api', userRoutes);

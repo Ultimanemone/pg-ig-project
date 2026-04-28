@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Manage Books</title>
+<link rel="stylesheet" href="style.css">
+
+<style>
+
+
+.table table{
+width:100%;
+border-collapse:collapse;
+table-layout:fixed;
+background:white;
+}
+
+.table th,
+.table td{
+padding:12px;
+border-bottom:1px solid #ddd;
+text-align:left;
+}
+
+.table th{
+background:#eee;
+}
+
+
+.table th:nth-child(1),
+.table td:nth-child(1){
+width:8%;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2){
+width:40%;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3){
+width:20%;
+}
+
+.table th:nth-child(4),
+.table td:nth-child(4){
+width:12%;
+}
+
+.table th:nth-child(5),
+.table td:nth-child(5){
+width:20%;
+text-align:center;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="sidebar">
+<h2>Library Admin</h2>
+
+<ul>
+<li><a href="dashboard.html">Dashboard</a></li>
+<li><a class="active" href="manage_books.html">Manage Books</a></li>
+<li><a href="manage_users.html">Manage Users</a></li>
+<li><a href="borrowing_history.html">Borrowing History</a></li>
+<li><a href="reports.html">Reports</a></li>
+<li><a href="settings.html">Settings</a></li>
+<li><a href="logout.html">Logout</a></li>
+</ul>
+
+</div>
+
+<div class="main">
+
+<h1>Manage Books</h1>
+
+<button id="addBookBtn">Add Book</button>
+
+<div class="table">
+
+<table>
+
+<tr>
+<th>ID</th>
+<th>Title</th>
+<th>Author</th>
+<th>Category</th>
+<th>Action</th>
+</tr>
+
+<tbody id="booksTableBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</body>
+
+<script src="../frontend/auth.js"></script>
+<script src="../frontend/auth-guard.js"></script>
+<script>
+const API_BASE = 'http://localhost:3000/api';
+const tableBody = document.getElementById('booksTableBody');
+const addBookBtn = document.getElementById('addBookBtn');
+
+const toIsoOrNull = (value) => value ? new Date(value).toISOString() : null;
+
+const request = (path, options = {}) => {
+	const headers = options.body
+		? AuthUtil.getAuthHeader()
+		: { Authorization: AuthUtil.getAuthHeader().Authorization };
+
+	return fetch(`${API_BASE}${path}`, {
+		...options,
+		headers
+	}).then((res) => res.json());
+};
+
+const renderRow = (book) => {
+	const tr = document.createElement('tr');
+	tr.innerHTML = `
+		<td>${book.res_id}</td>
+		<td>${book.title || ''}</td>
+		<td>${book.author || ''}</td>
+		<td>${book.category || 'Uncategorized'}</td>
+		<td>
+   <button data-edit-id="${book.res_id}">Edit</button>
+   <button data-delete-id="${book.res_id}">Delete</button>
+		</td>
+	`;
+	return tr;
+};
+
+const loadBooks = () => {
+	request('/')
+		.then((payload) => {
+			const books = payload.data || [];
+			tableBody.innerHTML = '';
+			books.forEach((book) => tableBody.appendChild(renderRow(book)));
+			if (!books.length) {
+				tableBody.innerHTML = '<tr><td colspan="5">No books found.</td></tr>';
+			}
+		})
+		.catch((error) => {
+			console.error('Failed to load books:', error);
+			tableBody.innerHTML = '<tr><td colspan="5">Failed to load books.</td></tr>';
+		});
+};
+
+const addBook = async () => {
+	const title = prompt('Book title:');
+	if (!title) return;
+	const author = prompt('Author:');
+	if (!author) return;
+	const description = prompt('Description:', '');
+	const availability = prompt('Availability (Available/Unavailable):', 'Available') || 'Available';
+	const category = prompt('Category:', '') || '';
+
+	const created = await request('/add', {
+		method: 'POST',
+		body: JSON.stringify({ title, author, description, availability })
+	});
+
+	if (!created.success) {
+		alert(created.message || 'Failed to add book');
+		return;
+	}
+
+	if (category && created.res_id) {
+		await request('/category/add', {
+			method: 'POST',
+			body: JSON.stringify({ res_id: created.res_id, category })
+		});
+	}
+
+	loadBooks();
+};
+
+const editBook = async (id) => {
+	const currentRow = [...tableBody.querySelectorAll('tr')].find((tr) => tr.children[0]?.textContent === String(id));
+	const currentTitle = currentRow?.children[1]?.textContent || '';
+	const currentAuthor = currentRow?.children[2]?.textContent || '';
+	const currentCategory = currentRow?.children[3]?.textContent === 'Uncategorized' ? '' : (currentRow?.children[3]?.textContent || '');
+
+	const title = prompt('Book title:', currentTitle);
+	if (!title) return;
+	const author = prompt('Author:', currentAuthor);
+	if (!author) return;
+	const description = prompt('Description:', '');
+	const availability = prompt('Availability (Available/Unavailable):', 'Available') || 'Available';
+	const category = prompt('Category (leave blank for none):', currentCategory) || '';
+
+	const updateRes = await request('/update', {
+		method: 'PUT',
+		body: JSON.stringify({ res_id: Number(id), title, author, description, availability })
+	});
+
+	if (!updateRes.success) {
+		alert(updateRes.message || 'Failed to update book');
+		return;
+	}
+
+	await request('/category/delete', {
+		method: 'DELETE',
+		body: JSON.stringify({ res_id: Number(id) })
+	});
+
+	if (category) {
+		await request('/category/add', {
+			method: 'POST',
+			body: JSON.stringify({ res_id: Number(id), category })
+		});
+	}
+
+	loadBooks();
+};
+
+const deleteBook = async (id) => {
+	if (!confirm(`Delete book #${id}?`)) return;
+	const deleted = await request('/delete', {
+		method: 'DELETE',
+		body: JSON.stringify({ res_id: Number(id) })
+	});
+
+	if (!deleted.success) {
+		alert(deleted.message || 'Failed to delete book');
+		return;
+	}
+
+	loadBooks();
+};
+
+addBookBtn.addEventListener('click', addBook);
+
+tableBody.addEventListener('click', (event) => {
+	const editId = event.target.getAttribute('data-edit-id');
+	const deleteId = event.target.getAttribute('data-delete-id');
+	if (editId) editBook(editId);
+	if (deleteId) deleteBook(deleteId);
+});
+
+loadBooks();
+</script>
+</html>

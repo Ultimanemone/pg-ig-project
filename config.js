@@ -1,7 +1,7 @@
 const sql = require('mssql/msnodesqlv8');
 
 const config = {
-    connectionString: 'Driver={ODBC Driver 18 for SQL Server};Server=localhost\\SQLEXPRESS;Database=Lazada;Trusted_Connection=yes;TrustServerCertificate=yes;',
+    connectionString: 'Driver={ODBC Driver 18 for SQL Server};Server=localhost\\SQLEXPRESS;Database=DigitalLibraryDB;Trusted_Connection=yes;TrustServerCertificate=yes;',
 };
 
 const poolPromise = new sql.ConnectionPool(config)

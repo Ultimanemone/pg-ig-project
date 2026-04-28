@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="sidebar">
+<h2>Library Admin</h2>
+
+<ul>
+<li><a class="active" href="dashboard.html">Dashboard</a></li>
+<li><a href="manage_books.html">Manage Books</a></li>
+<li><a href="manage_users.html">Manage Users</a></li>
+<li><a href="borrowing_history.html">Borrowing History</a></li>
+<li><a href="reports.html">Reports</a></li>
+<li><a href="settings.html">Settings</a></li>
+<li><a href="logout.html">Logout</a></li>
+</ul>
+
+</div>
+
+
+<div class="main">
+
+<div class="header">
+<h1>Dashboard</h1>
+<div class="profile" data-auth-user>Admin</div>
+</div>
+
+<div class="cards">
+
+<div class="card">
+<h3>Total Books</h3>
+<p id="totalBooks">0</p>
+</div>
+
+<div class="card">
+<h3>Total Users</h3>
+<p id="totalUsers">0</p>
+</div>
+
+<div class="card">
+<h3>Borrowed Today</h3>
+<p id="borrowedToday">0</p>
+</div>
+
+<div class="card">
+<h3>Overdue Books</h3>
+<p id="overdueBooks">0</p>
+</div>
+
+</div>
+
+</div>
+
+</body>
+
+<script src="../frontend/auth.js"></script>
+<script src="../frontend/auth-guard.js"></script>
+<script>
+	const API_BASE = 'http://localhost:3000/api';
+
+	const startOfToday = new Date();
+	startOfToday.setHours(0, 0, 0, 0);
+
+	const isToday = (dateString) => {
+		const d = new Date(dateString);
+		return !Number.isNaN(d.getTime()) && d >= startOfToday;
+	};
+
+	Promise.all([
+		fetch(`${API_BASE}/`, { headers: AuthUtil.getAuthHeader() }).then(r => r.json()),
+		fetch(`${API_BASE}/accounts`, { headers: AuthUtil.getAuthHeader() }).then(r => r.json()),
+		fetch(`${API_BASE}/log/borrow`, { headers: AuthUtil.getAuthHeader() }).then(r => r.json())
+	]).then(([resourcesRes, usersRes, borrowRes]) => {
+		const resources = resourcesRes.data || [];
+		const users = usersRes.data || [];
+		const borrows = borrowRes.data || [];
+
+		document.getElementById('totalBooks').textContent = resources.length;
+		document.getElementById('totalUsers').textContent = users.length;
+		document.getElementById('borrowedToday').textContent = borrows.filter((b) => isToday(b.borrow_date)).length;
+		document.getElementById('overdueBooks').textContent = borrows.filter((b) => b.status === 'Overdue').length;
+	}).catch((error) => {
+		console.error('Failed to load dashboard data:', error);
+	});
+</script>
+
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Manage Users</title>
+<link rel="stylesheet" href="style.css">
+
+<style>
+
+.table table{
+width:100%;
+border-collapse:collapse;
+table-layout:fixed;
+background:white;
+}
+
+.table th,
+.table td{
+padding:12px;
+border-bottom:1px solid #ddd;
+text-align:left;
+}
+
+.table th{
+background:#eee;
+}
+
+/* column widths */
+
+.table th:nth-child(1),
+.table td:nth-child(1){
+width:8%;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2){
+width:20%;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3){
+width:30%;
+}
+
+.table th:nth-child(4),
+.table td:nth-child(4){
+width:12%;
+}
+
+.table th:nth-child(5),
+.table td:nth-child(5){
+width:10%;
+}
+
+.table th:nth-child(6),
+.table td:nth-child(6){
+width:20%;
+text-align:center;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<h2>Library Admin</h2>
+
+<ul>
+<li><a href="dashboard.html">Dashboard</a></li>
+<li><a href="manage_books.html">Manage Books</a></li>
+<li><a class="active" href="manage_users.html">Manage Users</a></li>
+<li><a href="borrowing_history.html">Borrowing History</a></li>
+<li><a href="reports.html">Reports</a></li>
+<li><a href="settings.html">Settings</a></li>
+<li><a href="logout.html">Logout</a></li>
+</ul>
+
+</div>
+
+<div class="main">
+
+<h1>Manage Users</h1>
+
+<button id="addUserBtn">Add User</button>
+
+<div class="table">
+
+<table>
+
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Email</th>
+<th>Role</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+
+<tbody id="usersTableBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</body>
+
+<script src="../frontend/auth.js"></script>
+<script src="../frontend/auth-guard.js"></script>
+<script>
+const API_BASE = 'http://localhost:3000/api';
+const usersBody = document.getElementById('usersTableBody');
+const addUserBtn = document.getElementById('addUserBtn');
+
+const statusFromRole = (role) => role ? 'Active' : 'Inactive';
+
+const request = (path, options = {}) => {
+	const headers = options.body
+		? AuthUtil.getAuthHeader()
+		: { Authorization: AuthUtil.getAuthHeader().Authorization };
+
+	return fetch(`${API_BASE}${path}`, {
+		...options,
+		headers
+	}).then((res) => res.json());
+};
+
+const renderRow = (user) => {
+	const tr = document.createElement('tr');
+	tr.innerHTML = `
+		<td>${user.user_id}</td>
+		<td>${user.nickname || ''}</td>
+		<td>${user.email || ''}</td>
+		<td>${user.role || ''}</td>
+		<td>${statusFromRole(user.role)}</td>
+		<td>
+			<button data-edit-id="${user.user_id}">Edit</button>
+			<button data-delete-id="${user.user_id}">Delete</button>
+		</td>
+	`;
+	return tr;
+};
+
+const loadUsers = () => {
+	request('/accounts')
+		.then((payload) => {
+			const users = payload.data || [];
+			usersBody.innerHTML = '';
+			users.forEach((user) => usersBody.appendChild(renderRow(user)));
+			if (!users.length) {
+				usersBody.innerHTML = '<tr><td colspan="6">No users found.</td></tr>';
+			}
+		})
+		.catch((error) => {
+			console.error('Failed to load users:', error);
+			usersBody.innerHTML = '<tr><td colspan="6">Failed to load users.</td></tr>';
+		});
+};
+
+const addUser = async () => {
+	const nickname = prompt('User name:');
+	if (!nickname) return;
+	const email = prompt('Email:');
+	if (!email) return;
+	const password = prompt('Password:');
+	if (!password) return;
+	const role = prompt('Role (Admin/User):', 'User') || 'User';
+
+	const created = await request('/accounts', {
+		method: 'POST',
+		body: JSON.stringify({ nickname, email, password, role })
+	});
+
+	if (!created.success) {
+		alert(created.message || 'Failed to create user');
+		return;
+	}
+
+	loadUsers();
+};
+
+const editUser = async (id) => {
+	const details = await request(`/accounts?user_id=${encodeURIComponent(id)}`);
+	if (!details.success || !details.user) {
+		alert(details.message || 'Failed to load user details');
+		return;
+	}
+
+	const current = details.user;
+	const nickname = prompt('User name:', current.nickname || '');
+	if (!nickname) return;
+	const email = prompt('Email:', current.email || '');
+	if (!email) return;
+	const password = prompt('Password:', current.password || '');
+	if (!password) return;
+	const role = prompt('Role (Admin/User):', current.role || 'User') || current.role || 'User';
+
+	const updated = await request('/accounts', {
+		method: 'PUT',
+		body: JSON.stringify({ user_id: Number(id), nickname, email, password, role })
+	});
+
+	if (!updated.success) {
+		alert(updated.message || 'Failed to update user');
+		return;
+	}
+
+	loadUsers();
+};
+
+const deleteUser = async (id) => {
+	if (!confirm(`Delete user #${id}?`)) return;
+
+	const deleted = await request('/accounts', {
+		method: 'DELETE',
+		body: JSON.stringify({ user_id: Number(id) })
+	});
+
+	if (!deleted.success) {
+		alert(deleted.message || 'Failed to delete user');
+		return;
+	}
+
+	loadUsers();
+};
+
+addUserBtn.addEventListener('click', addUser);
+
+usersBody.addEventListener('click', (event) => {
+	const editId = event.target.getAttribute('data-edit-id');
+	const deleteId = event.target.getAttribute('data-delete-id');
+	if (editId) editUser(editId);
+	if (deleteId) deleteUser(deleteId);
+});
+
+loadUsers();
+</script>
+</html>

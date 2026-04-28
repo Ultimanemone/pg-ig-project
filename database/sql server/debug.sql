@@ -1,3 +1,6 @@
+USE DigitalLibraryDB;
+GO
+
 select * from dbo.[USER];
 go
 

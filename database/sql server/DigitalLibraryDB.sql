@@ -39,9 +39,9 @@ CREATE TABLE dbo.RESOURCE (
     res_id INT IDENTITY(1,1) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     author VARCHAR(150) NOT NULL,
-    description VARCHAR(MAX) NULL
+    description VARCHAR(MAX) NULL,
     availability VARCHAR(50) NOT NULL DEFAULT 'Available',
-    CONSTRAINT CK_RESOURCE_AVAILABILITY CHECK (availability IN ('Available', 'Unavailable')
+    CONSTRAINT CK_RESOURCE_AVAILABILITY CHECK (availability IN ('Available', 'Unavailable'))
 );
 GO
 
@@ -99,8 +99,8 @@ GO
 -- USER sample data
 INSERT INTO dbo.[USER] (nickname, email, [password], role)
 VALUES
-('Nguyen Van A', 'nguyenvana@gmail.com', 'nguyevana123', 'Student'),
-('Tran Thi B', 'tranthib@gmail.com', 'tranthib123', 'Student'),
+('Nguyen Van A', 'nguyenvana@gmail.com', 'nguyevana123', 'User'),
+('Tran Thi B', 'tranthib@gmail.com', 'tranthib123', 'User'),
 ('Le Minh C', 'leminhc@gmail.com', 'leminhc123', 'Admin');
 GO
 
@@ -147,4 +147,89 @@ VALUES
 (1, 'Bookmarked resource 3', '2026-03-15 08:10:00'),
 (2, 'Borrowed resource 2', '2026-03-15 09:00:00'),
 (3, 'Updated resource information', '2026-03-15 10:00:00');
+GO
+
+-- ADDITIONAL USER sample data
+INSERT INTO dbo.[USER] (nickname, email, [password], role)
+VALUES
+('Pham Quoc D', 'phamquocd@gmail.com', 'phamquocd123', 'User'),
+('Vo Ngoc E', 'vongoce@gmail.com', 'vongoce123', 'User'),
+('Bui Thanh F', 'buithanhf@gmail.com', 'buithanhf123', 'User'),
+('Do Mai G', 'domaig@gmail.com', 'domaig123', 'User'),
+('Ngo Duc H', 'ngoduch@gmail.com', 'ngoduch123', 'User'),
+('Pham Nhat I', 'phamnhati@gmail.com', 'phamnhati123', 'Admin'),
+('Hoang Linh J', 'hoanglinhj@gmail.com', 'hoanglinhj123', 'User');
+GO
+
+-- ADDITIONAL RESOURCE sample data
+INSERT INTO dbo.RESOURCE (title, author, description)
+VALUES
+('Clean Code', 'Robert C. Martin', 'A handbook of agile software craftsmanship'),
+('Design Patterns', 'Erich Gamma', 'Elements of reusable object-oriented software'),
+('Deep Learning', 'Ian Goodfellow', 'Comprehensive deep learning foundations'),
+('Computer Networks', 'Andrew S. Tanenbaum', 'Classic introduction to networking concepts'),
+('The Pragmatic Programmer', 'Andrew Hunt', 'Practical software engineering practices'),
+('Refactoring', 'Martin Fowler', 'Improving design of existing code'),
+('Artificial Intelligence: A Modern Approach', 'Stuart Russell', 'Standard textbook for AI'),
+('Introduction to Algorithms', 'Thomas H. Cormen', 'Core algorithms and data structures'),
+('Effective Java', 'Joshua Bloch', 'Best practices for Java programming'),
+('Modern Operating Systems', 'Andrew S. Tanenbaum', 'Advanced operating systems concepts');
+GO
+
+INSERT INTO dbo.RESOURCECATEGORY (res_id, category)
+VALUES
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Clean Code'), 'Software Engineering'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Design Patterns'), 'Software Engineering'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Deep Learning'), 'AI'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Computer Networks'), 'Computer Science'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'The Pragmatic Programmer'), 'Software Engineering'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Refactoring'), 'Software Engineering'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Artificial Intelligence: A Modern Approach'), 'AI'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Introduction to Algorithms'), 'Programming'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Effective Java'), 'Programming'),
+((SELECT res_id FROM dbo.RESOURCE WHERE title = 'Modern Operating Systems'), 'Computer Science');
+GO
+
+-- ADDITIONAL BOOKMARK sample data
+INSERT INTO dbo.BOOKMARK (user_id, res_id)
+VALUES
+(3, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Clean Code')),
+(4, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Design Patterns')),
+(4, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Deep Learning')),
+(5, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Computer Networks')),
+(6, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'The Pragmatic Programmer')),
+(7, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Refactoring')),
+(8, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Artificial Intelligence: A Modern Approach')),
+(9, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Introduction to Algorithms')),
+(10, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Effective Java'));
+GO
+
+-- ADDITIONAL BORROW_RECORD sample data
+INSERT INTO dbo.BORROW_RECORD (user_id, res_id, borrow_date, return_date, status)
+VALUES
+(3, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Clean Code'), '2026-03-18', NULL, 'Borrowed'),
+(4, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Design Patterns'), '2026-03-10', '2026-03-17', 'Returned'),
+(5, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Deep Learning'), '2026-03-07', NULL, 'Overdue'),
+(6, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Computer Networks'), '2026-03-20', NULL, 'Borrowed'),
+(7, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'The Pragmatic Programmer'), '2026-03-11', '2026-03-19', 'Returned'),
+(8, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Refactoring'), '2026-03-05', NULL, 'Overdue'),
+(9, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Artificial Intelligence: A Modern Approach'), '2026-03-21', NULL, 'Borrowed'),
+(10, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Introduction to Algorithms'), '2026-03-08', '2026-03-15', 'Returned'),
+(1, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Effective Java'), '2026-03-22', NULL, 'Borrowed'),
+(2, (SELECT res_id FROM dbo.RESOURCE WHERE title = 'Modern Operating Systems'), '2026-03-04', NULL, 'Overdue');
+GO
+
+-- ADDITIONAL SYSTEM_LOG sample data
+INSERT INTO dbo.SYSTEM_LOG (user_id, action, [timestamp])
+VALUES
+(4, 'Login', '2026-03-16 07:45:00'),
+(4, 'Borrowed Design Patterns', '2026-03-16 08:00:00'),
+(5, 'Searched AI resources', '2026-03-16 08:20:00'),
+(6, 'Added bookmark for Computer Networks', '2026-03-16 08:35:00'),
+(7, 'Returned The Pragmatic Programmer', '2026-03-16 09:10:00'),
+(8, 'Updated profile settings', '2026-03-16 09:25:00'),
+(9, 'Borrowed AI: A Modern Approach', '2026-03-16 09:40:00'),
+(10, 'Reviewed borrowing history', '2026-03-16 10:00:00'),
+(3, 'Admin generated monthly report', '2026-03-16 10:30:00'),
+(9, 'Logged out', '2026-03-16 10:45:00');
 GO

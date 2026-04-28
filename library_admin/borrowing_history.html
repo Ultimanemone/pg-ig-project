@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Borrowing History</title>
+<link rel="stylesheet" href="style.css">
+
+<style>
+
+.table table{
+width:100%;
+border-collapse:collapse;
+table-layout:fixed;
+background:white;
+}
+
+.table th,
+.table td{
+padding:12px;
+border-bottom:1px solid #ddd;
+text-align:left;
+}
+
+.table th{
+background:#eee;
+}
+
+.table th:nth-child(1),
+.table td:nth-child(1){
+width:20%;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2){
+width:30%;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3){
+width:15%;
+}
+
+.table th:nth-child(4),
+.table td:nth-child(4){
+width:15%;
+}
+
+.table th:nth-child(5),
+.table td:nth-child(5){
+width:15%;
+}
+
+.table th:nth-child(6),
+.table td:nth-child(6){
+width:20%;
+text-align:center;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<h2>Library Admin</h2>
+
+<ul>
+<li><a href="dashboard.html">Dashboard</a></li>
+<li><a href="manage_books.html">Manage Books</a></li>
+<li><a href="manage_users.html">Manage Users</a></li>
+<li><a class="active" href="borrowing_history.html">Borrowing History</a></li>
+<li><a href="reports.html">Reports</a></li>
+<li><a href="settings.html">Settings</a></li>
+<li><a href="logout.html">Logout</a></li>
+</ul>
+
+</div>
+
+<div class="main">
+
+<h1>Borrowing History</h1>
+
+<button id="addBorrowBtn">Add Borrow Record</button>
+
+<div class="table">
+
+<table>
+
+<tr>
+<th>User</th>
+<th>Book</th>
+<th>Date Borrowed</th>
+<th>Due Date</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+
+<tbody id="borrowHistoryBody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</body>
+
+<script src="../frontend/auth.js"></script>
+<script src="../frontend/auth-guard.js"></script>
+<script>
+const API_BASE = 'http://localhost:3000/api';
+const borrowBody = document.getElementById('borrowHistoryBody');
+const addBorrowBtn = document.getElementById('addBorrowBtn');
+
+const request = (path, options = {}) => {
+	const headers = options.body
+		? AuthUtil.getAuthHeader()
+		: { Authorization: AuthUtil.getAuthHeader().Authorization };
+
+	return fetch(`${API_BASE}${path}`, {
+		...options,
+		headers
+	}).then((res) => res.json());
+};
+
+const formatDate = (value) => {
+	if (!value) return '-';
+	const d = new Date(value);
+	if (Number.isNaN(d.getTime())) return '-';
+	return d.toLocaleDateString('en-GB');
+};
+
+const formatDateInput = (value) => {
+	if (!value) return '';
+	const d = new Date(value);
+	if (Number.isNaN(d.getTime())) return '';
+	return d.toISOString().slice(0, 10);
+};
+
+const loadBorrowHistory = () => {
+	request('/log/borrow')
+		.then((payload) => {
+			const items = payload.data || [];
+			borrowBody.innerHTML = '';
+			items.forEach((item) => {
+				const tr = document.createElement('tr');
+				tr.setAttribute('data-borrow-id', item.borrow_id);
+				tr.setAttribute('data-user-id', item.user_id);
+				tr.setAttribute('data-res-id', item.res_id);
+				tr.setAttribute('data-borrow-date', item.borrow_date || '');
+				tr.setAttribute('data-return-date', item.return_date || '');
+				tr.setAttribute('data-status', item.status || 'Borrowed');
+				tr.innerHTML = `
+					<td>${item.nickname || item.email || ''}</td>
+					<td>${item.title || ''}</td>
+					<td>${formatDate(item.borrow_date)}</td>
+					<td>${formatDate(item.return_date)}</td>
+					<td>${item.status || ''}</td>
+					<td>
+						<button data-edit-id="${item.borrow_id}">Edit</button>
+						<button data-delete-id="${item.borrow_id}">Delete</button>
+					</td>
+				`;
+				borrowBody.appendChild(tr);
+			});
+			if (!items.length) {
+				borrowBody.innerHTML = '<tr><td colspan="6">No borrowing history found.</td></tr>';
+			}
+		})
+		.catch((error) => {
+			console.error('Failed to load borrowing history:', error);
+			borrowBody.innerHTML = '<tr><td colspan="6">Failed to load borrowing history.</td></tr>';
+		});
+};
+
+const addBorrowRecord = async () => {
+	const user_id = prompt('User ID:');
+	if (!user_id) return;
+	const res_id = prompt('Book ID (res_id):');
+	if (!res_id) return;
+	const borrow_date = prompt('Borrow date (YYYY-MM-DD):', new Date().toISOString().slice(0, 10));
+	if (!borrow_date) return;
+	const return_date = prompt('Due/Return date (YYYY-MM-DD, optional):', '');
+	const status = prompt('Status (Borrowed/Returned/Overdue):', 'Borrowed') || 'Borrowed';
+
+	const created = await request('/log/borrow', {
+		method: 'POST',
+		body: JSON.stringify({
+			user_id: Number(user_id),
+			res_id: Number(res_id),
+			borrow_date,
+			return_date: return_date || null,
+			status
+		})
+	});
+
+	if (!created.success) {
+		alert(created.message || 'Failed to add borrow record');
+		return;
+	}
+
+	loadBorrowHistory();
+};
+
+const editBorrowRecord = async (borrowId) => {
+	const row = borrowBody.querySelector(`tr[data-borrow-id="${borrowId}"]`);
+	if (!row) return;
+
+	const user_id = prompt('User ID:', row.getAttribute('data-user-id') || '');
+	if (!user_id) return;
+	const res_id = prompt('Book ID (res_id):', row.getAttribute('data-res-id') || '');
+	if (!res_id) return;
+	const borrow_date = prompt('Borrow date (YYYY-MM-DD):', formatDateInput(row.getAttribute('data-borrow-date')));
+	if (!borrow_date) return;
+	const return_date = prompt('Due/Return date (YYYY-MM-DD, optional):', formatDateInput(row.getAttribute('data-return-date')));
+	const status = prompt('Status (Borrowed/Returned/Overdue):', row.getAttribute('data-status') || 'Borrowed') || 'Borrowed';
+
+	const updated = await request('/log/borrow', {
+		method: 'PUT',
+		body: JSON.stringify({
+			borrow_id: Number(borrowId),
+			user_id: Number(user_id),
+			res_id: Number(res_id),
+			borrow_date,
+			return_date: return_date || null,
+			status
+		})
+	});
+
+	if (!updated.success) {
+		alert(updated.message || 'Failed to update borrow record');
+		return;
+	}
+
+	loadBorrowHistory();
+};
+
+const deleteBorrowRecord = async (borrowId) => {
+	if (!confirm(`Delete borrow record #${borrowId}?`)) return;
+
+	const deleted = await request('/log/borrow', {
+		method: 'DELETE',
+		body: JSON.stringify({ borrow_id: Number(borrowId) })
+	});
+
+	if (!deleted.success) {
+		alert(deleted.message || 'Failed to delete borrow record');
+		return;
+	}
+
+	loadBorrowHistory();
+};
+
+addBorrowBtn.addEventListener('click', addBorrowRecord);
+
+borrowBody.addEventListener('click', (event) => {
+	const editId = event.target.getAttribute('data-edit-id');
+	const deleteId = event.target.getAttribute('data-delete-id');
+	if (editId) editBorrowRecord(editId);
+	if (deleteId) deleteBorrowRecord(deleteId);
+});
+
+loadBorrowHistory();
+</script>
+</html>
