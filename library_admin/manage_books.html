@@ -78,6 +78,36 @@ text-align:center;
 <h1>Manage Books</h1>
 
 <button id="addBookBtn">Add Book</button>
+<!-- Add/Edit Modal -->
+<div id="bookModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:white; border-radius:10px; padding:32px; width:420px; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <h2 id="modalTitle" style="margin-top:0;">Add Book</h2>
+    <input type="hidden" id="editResId" />
+
+    <label>Title</label><br/>
+    <input id="editTitle" type="text" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;" /><br/>
+
+    <label>Author</label><br/>
+    <input id="editAuthor" type="text" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;" /><br/>
+
+    <label>Description</label><br/>
+    <input id="editDescription" type="text" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;" /><br/>
+
+    <label>Availability</label><br/>
+    <select id="editAvailability" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;">
+      <option value="Available">Available</option>
+      <option value="Unavailable">Unavailable</option>
+    </select><br/>
+
+    <label>Category</label><br/>
+    <input id="editCategory" type="text" style="width:100%; margin-bottom:20px; padding:8px; box-sizing:border-box;" /><br/>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button id="modalDiscardBtn" style="padding:10px 20px; background:#e9edf2; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Discard</button>
+      <button id="modalSaveBtn" style="padding:10px 20px; background:#1f2d3d; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="table">
 
@@ -105,6 +135,23 @@ text-align:center;
 <script src="../frontend/auth-guard.js"></script>
 <script>
 const API_BASE = 'http://localhost:3000/api';
+	//Toast thông báo
+    function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position: fixed; bottom: 24px; right: 24px; padding: 14px 28px;
+      border-radius: 8px; color: white; font-weight: 600; z-index: 10000;
+      background: ${type === 'success' ? '#28a745' : '#dc3545'};
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      transition: opacity 0.4s;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 500);
+    }, 3200);
+  }
 const tableBody = document.getElementById('booksTableBody');
 const addBookBtn = document.getElementById('addBookBtn');
 
@@ -152,95 +199,131 @@ const loadBooks = () => {
 		});
 };
 
-const addBook = async () => {
-	const title = prompt('Book title:');
-	if (!title) return;
-	const author = prompt('Author:');
-	if (!author) return;
-	const description = prompt('Description:', '');
-	const availability = prompt('Availability (Available/Unavailable):', 'Available') || 'Available';
-	const category = prompt('Category:', '') || '';
+const openAddModal = () => {
+  document.getElementById('modalTitle').textContent = 'Add Book';
+  document.getElementById('editResId').value = '';
+  document.getElementById('editTitle').value = '';
+  document.getElementById('editAuthor').value = '';
+  document.getElementById('editDescription').value = '';
+  document.getElementById('editAvailability').value = 'Available';
+  document.getElementById('editCategory').value = '';
+  document.getElementById('modalSaveBtn').textContent = 'Add Book';
 
-	const created = await request('/add', {
-		method: 'POST',
-		body: JSON.stringify({ title, author, description, availability })
-	});
-
-	if (!created.success) {
-		alert(created.message || 'Failed to add book');
-		return;
-	}
-
-	if (category && created.res_id) {
-		await request('/category/add', {
-			method: 'POST',
-			body: JSON.stringify({ res_id: created.res_id, category })
-		});
-	}
-
-	loadBooks();
+  document.getElementById('bookModal').style.display = 'flex';
 };
 
-const editBook = async (id) => {
-	const currentRow = [...tableBody.querySelectorAll('tr')].find((tr) => tr.children[0]?.textContent === String(id));
-	const currentTitle = currentRow?.children[1]?.textContent || '';
-	const currentAuthor = currentRow?.children[2]?.textContent || '';
-	const currentCategory = currentRow?.children[3]?.textContent === 'Uncategorized' ? '' : (currentRow?.children[3]?.textContent || '');
+// Thay hẳn cái edit sách bằng cái modal
+const openEditModal = (id) => {
+  const currentRow = [...tableBody.querySelectorAll('tr')].find((tr) => tr.children[0]?.textContent === String(id));
+  const currentTitle = currentRow?.children[1]?.textContent || '';
+  const currentAuthor = currentRow?.children[2]?.textContent || '';
+  const currentCategory = currentRow?.children[3]?.textContent === 'Uncategorized' ? '' : (currentRow?.children[3]?.textContent || '');
 
-	const title = prompt('Book title:', currentTitle);
-	if (!title) return;
-	const author = prompt('Author:', currentAuthor);
-	if (!author) return;
-	const description = prompt('Description:', '');
-	const availability = prompt('Availability (Available/Unavailable):', 'Available') || 'Available';
-	const category = prompt('Category (leave blank for none):', currentCategory) || '';
+  document.getElementById('editResId').value = id;
+  document.getElementById('editTitle').value = currentTitle;
+  document.getElementById('editAuthor').value = currentAuthor;
+  document.getElementById('editDescription').value = '';
+  document.getElementById('editCategory').value = currentCategory;
 
-	const updateRes = await request('/update', {
-		method: 'PUT',
-		body: JSON.stringify({ res_id: Number(id), title, author, description, availability })
-	});
-
-	if (!updateRes.success) {
-		alert(updateRes.message || 'Failed to update book');
-		return;
-	}
-
-	await request('/category/delete', {
-		method: 'DELETE',
-		body: JSON.stringify({ res_id: Number(id) })
-	});
-
-	if (category) {
-		await request('/category/add', {
-			method: 'POST',
-			body: JSON.stringify({ res_id: Number(id), category })
-		});
-	}
-
-	loadBooks();
+  document.getElementById('modalTitle').textContent = 'Edit Book';
+  document.getElementById('modalSaveBtn').textContent = 'Save Changes';
+  document.getElementById('bookModal').style.display = 'flex';
 };
 
+//Xóa book
 const deleteBook = async (id) => {
-	if (!confirm(`Delete book #${id}?`)) return;
-	const deleted = await request('/delete', {
-		method: 'DELETE',
-		body: JSON.stringify({ res_id: Number(id) })
-	});
+  if (!confirm(`Delete book #${id}?`)) return;
+  const deleted = await request('/delete', {
+    method: 'DELETE',
+    body: JSON.stringify({ res_id: Number(id) })
+  });
 
-	if (!deleted.success) {
-		alert(deleted.message || 'Failed to delete book');
-		return;
-	}
+  if (!deleted.success) {
+    showToast('Failed to delete book', 'error');
+    return;
+  }
 
-	loadBooks();
+  loadBooks();
 };
 
-addBookBtn.addEventListener('click', addBook);
+// Xử lý lưu khi bấm Save
+const handleModalSave = async () => {
+  const id = document.getElementById('editResId').value;
+  const title = document.getElementById('editTitle').value.trim();
+  const author = document.getElementById('editAuthor').value.trim();
+  const description = document.getElementById('editDescription').value.trim();
+  const availability = document.getElementById('editAvailability').value;
+  const category = document.getElementById('editCategory').value.trim();
+
+  if (!title || !author) {
+    showToast('Title and Author are required', 'error');
+    return;
+  }
+
+  // Nếu không có id → đang Add
+  if (!id) {
+    const created = await request('/add', {
+      method: 'POST',
+      body: JSON.stringify({ title, author, description, availability })
+    });
+
+    if (!created.success) {
+      showToast('Failed to add book', 'error');
+      return;
+    }
+
+    if (category && created.res_id) {
+      await request('/category/add', {
+        method: 'POST',
+        body: JSON.stringify({ res_id: created.res_id, category })
+      });
+    }
+
+    document.getElementById('bookModal').style.display = 'none';
+    showToast('Book added successfully', 'success');
+    loadBooks();
+    return;
+  }
+
+  // Nếu có id → đang Edit
+  const updateRes = await request('/update', {
+    method: 'PUT',
+    body: JSON.stringify({ res_id: Number(id), title, author, description, availability })
+  });
+
+  if (!updateRes.success) {
+    showToast(updateRes.message || 'Failed to update book', 'error');
+    return;
+  }
+
+  await request('/category/delete', {
+    method: 'DELETE',
+    body: JSON.stringify({ res_id: Number(id) })
+  });
+
+  if (category) {
+    await request('/category/add', {
+      method: 'POST',
+      body: JSON.stringify({ res_id: Number(id), category })
+    });
+  }
+
+  document.getElementById('bookModal').style.display = 'none';
+  showToast('Book updated successfully', 'success');
+  loadBooks();
+};
+
+//Thêm event cho 2 nút trong modal
+addBookBtn.addEventListener('click', openAddModal);
+document.getElementById('modalSaveBtn').addEventListener('click', handleModalSave);
+document.getElementById('modalDiscardBtn').addEventListener('click', () => {
+  document.getElementById('bookModal').style.display = 'none';
+});
 
 tableBody.addEventListener('click', (event) => {
 	const editId = event.target.getAttribute('data-edit-id');
 	const deleteId = event.target.getAttribute('data-delete-id');
-	if (editId) editBook(editId);
+	if (editId) openEditModal(editId);//sửa EditBook thành EditModal
 	if (deleteId) deleteBook(deleteId);
 });
 

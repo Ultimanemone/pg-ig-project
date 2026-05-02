@@ -1,0 +1,90 @@
+// Prisma schema for Digital Library Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id       Int              @id @default(autoincrement())
+  nickname      String           @db.VarChar(100)
+  email         String           @unique @db.VarChar(150)
+  password      String           @db.VarChar(255)
+  role          String           @db.VarChar(50)
+  creationDate  DateTime         @default(now())
+  preferences   UserPreference[]
+  bookmarks     Bookmark[]
+  borrowRecords BorrowRecord[]
+  systemLogs    SystemLog[]
+
+  @@map("USER")
+}
+
+model UserPreference {
+  user_id  Int      @id
+  category String   @db.VarChar(100)
+  count    Int
+  lastRead DateTime @default(now())
+  user     User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+
+  @@map("USERPREFERENCE")
+}
+
+model Resource {
+  res_id        Int               @id @default(autoincrement())
+  title         String            @db.VarChar(255)
+  author        String            @db.VarChar(150)
+  description   String?           @db.Text
+  availability  String            @default("Available") @db.VarChar(50)
+  category      ResourceCategory?
+  bookmarks     Bookmark[]
+  borrowRecords BorrowRecord[]
+
+  @@map("RESOURCE")
+}
+
+model ResourceCategory {
+  res_id   Int      @id
+  category String   @db.VarChar(100)
+  resource Resource @relation(fields: [res_id], references: [res_id], onDelete: Cascade)
+
+  @@map("RESOURCECATEGORY")
+}
+
+model Bookmark {
+  bm_id    Int      @id @default(autoincrement())
+  user_id  Int
+  res_id   Int
+  user     User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  resource Resource @relation(fields: [res_id], references: [res_id], onDelete: Cascade)
+
+  @@map("BOOKMARK")
+}
+
+model BorrowRecord {
+  borrow_id   Int       @id @default(autoincrement())
+  user_id     Int
+  res_id      Int
+  borrow_date DateTime  @default(now())
+  return_date DateTime?
+  status      String    @db.VarChar(50)
+  user        User      @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  resource    Resource  @relation(fields: [res_id], references: [res_id], onDelete: Cascade)
+
+  @@map("BORROW_RECORD")
+}
+
+model SystemLog {
+  log_id    Int      @id @default(autoincrement())
+  user_id   Int
+  action    String   @db.VarChar(255)
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [user_id], references: [user_id])
+
+  @@map("SYSTEM_LOG")
+}
+

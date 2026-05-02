@@ -1,266 +1,137 @@
-const { sql, poolPromise } = require('../../config');
+const prisma = require('../prismaClient');
 
 const addResource = async ({ title, author, description, availability }) => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .input('Title', sql.NVarChar, title)
-        .input('Author', sql.NVarChar, author)
-        .input('Description', sql.NVarChar, description)
-        .input('Availability', sql.NVarChar, availability || 'Available')
-        .query(`
-            INSERT INTO dbo.RESOURCE (title, author, description, availability)
-            OUTPUT INSERTED.res_id
-            VALUES (@Title, @Author, @Description, @Availability)
-        `);
-
-    return result.recordset[0]?.res_id || null;
+    const resource = await prisma.resource.create({
+        data: { title, author, description, availability: availability || 'Available' }
+    });
+    return resource.res_id;
 };
 
 const getResources = async () => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .query(`
-            WITH RankedResources AS (
-                SELECT r.res_id, r.title, r.author, r.description, r.availability,
-                       ROW_NUMBER() OVER (PARTITION BY r.title, r.author ORDER BY r.res_id) AS rn
-                FROM dbo.RESOURCE r
-            )
-            SELECT rr.res_id, rr.title, rr.author, rr.description, rr.availability, rc.category
-            FROM RankedResources rr
-            LEFT JOIN dbo.RESOURCECATEGORY rc ON rc.res_id = rr.res_id
-            WHERE rr.rn = 1
-            ORDER BY rr.res_id
-        `);
-
-    return result.recordset;
+    const resources = await prisma.resource.findMany({
+        include: { category: true },
+        orderBy: { res_id: 'asc' }
+    });
+    const seen = new Map();
+    const result = [];
+    for (const r of resources) {
+        const key = r.title + '||' + r.author;
+        if (!seen.has(key)) {
+            seen.set(key, true);
+            result.push({
+                res_id: r.res_id,
+                title: r.title,
+                author: r.author,
+                description: r.description,
+                availability: r.availability,
+                category: r.category ? r.category.category : null
+            });
+        }
+    }
+    return result;
 };
 
 const updateResource = async ({ res_id, title, author, description, availability }) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('ResID', sql.Int, res_id)
-        .input('Title', sql.NVarChar, title)
-        .input('Author', sql.NVarChar, author)
-        .input('Description', sql.NVarChar, description)
-        .input('Availability', sql.NVarChar, availability)
-        .query(`
-            UPDATE dbo.RESOURCE
-            SET title = @Title, author = @Author, description = @Description, availability = @Availability
-            WHERE res_id = @ResID
-        `);
+    await prisma.resource.update({
+        where: { res_id: Number(res_id) },
+        data: { title, author, description, availability }
+    });
 };
 
 const deleteResource = async (resId) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('ResID', sql.Int, resId)
-        .query(`
-            DELETE FROM dbo.RESOURCE
-            WHERE res_id = @ResID
-        `);
+    await prisma.resource.delete({ where: { res_id: Number(resId) } });
 };
 
 const addCategory = async ({ res_id, category }) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('ResID', sql.Int, res_id)
-        .input('Category', sql.NVarChar, category)
-        .query(`
-            INSERT INTO dbo.RESOURCECATEGORY (res_id, category)
-            VALUES (@ResID, @Category)
-        `);
+    await prisma.resourceCategory.create({ data: { res_id: Number(res_id), category } });
 };
 
 const getCategories = async () => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .query(`
-            SELECT * FROM dbo.RESOURCECATEGORY
-        `);
-
-    return result.recordset;
+    return prisma.resourceCategory.findMany();
 };
 
 const updateCategory = async ({ res_id, category }) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('ResID', sql.Int, res_id)
-        .input('Category', sql.NVarChar, category)
-        .query(`
-            UPDATE dbo.RESOURCECATEGORY
-            SET category = @Category
-            WHERE res_id = @ResID
-        `);
+    await prisma.resourceCategory.update({
+        where: { res_id: Number(res_id) },
+        data: { category }
+    });
 };
 
 const deleteCategory = async (resId) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('ResID', sql.Int, resId)
-        .query(`
-            DELETE FROM dbo.RESOURCECATEGORY
-            WHERE res_id = @ResID
-        `);
+    await prisma.resourceCategory.delete({ where: { res_id: Number(resId) } });
 };
 
 const addBookmark = async ({ user_id, res_id }) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('UserID', sql.Int, user_id)
-        .input('ResID', sql.Int, res_id)
-        .query(`
-            INSERT INTO dbo.BOOKMARK (user_id, res_id)
-            VALUES (@UserID, @ResID)
-        `);
+    await prisma.bookmark.create({ data: { user_id: Number(user_id), res_id: Number(res_id) } });
 };
 
 const getBookmarks = async (userId) => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .input('UserID', sql.Int, userId)
-        .query(`
-            SELECT b.bm_id, b.user_id, b.res_id, r.title, r.author, r.availability
-            FROM dbo.BOOKMARK b
-            INNER JOIN dbo.RESOURCE r ON r.res_id = b.res_id
-            WHERE b.user_id = @UserID
-            ORDER BY b.bm_id
-        `);
-
-    return result.recordset;
+    const bookmarks = await prisma.bookmark.findMany({
+        where: { user_id: Number(userId) },
+        include: { resource: true },
+        orderBy: { bm_id: 'asc' }
+    });
+    return bookmarks.map(b => ({
+        bm_id: b.bm_id,
+        user_id: b.user_id,
+        res_id: b.res_id,
+        title: b.resource.title,
+        author: b.resource.author,
+        availability: b.resource.availability
+    }));
 };
 
 const deleteBookmark = async (bmId) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('BMID', sql.Int, bmId)
-        .query(`
-            DELETE FROM dbo.BOOKMARK
-            WHERE bm_id = @BMID
-        `);
+    await prisma.bookmark.delete({ where: { bm_id: Number(bmId) } });
 };
 
 const borrowResource = async ({ user_id, res_id }) => {
-    const pool = await poolPromise;
+    const uid = Number(user_id);
+    const rid = Number(res_id);
 
-    const availabilityResult = await pool.request()
-        .input('ResID', sql.Int, res_id)
-        .query(`
-            SELECT availability, title
-            FROM dbo.RESOURCE
-            WHERE res_id = @ResID
-        `);
+    const resource = await prisma.resource.findUnique({ where: { res_id: rid } });
+    if (!resource) throw new Error('Resource not found');
+    if (resource.availability !== 'Available') throw new Error('Resource is currently unavailable');
 
-    if (!availabilityResult.recordset.length) {
-        throw new Error('Resource not found');
-    }
+    await prisma.borrowRecord.create({
+        data: {
+            user_id: uid,
+            res_id: rid,
+            borrow_date: new Date(),
+            return_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            status: 'Borrowed'
+        }
+    });
 
-    const resource = availabilityResult.recordset[0];
-    if (resource.availability !== 'Available') {
-        throw new Error('Resource is currently unavailable');
-    }
-
-    await pool.request()
-        .input('UserID', sql.Int, user_id)
-        .input('ResID', sql.Int, res_id)
-        .input('Status', sql.NVarChar, 'Borrowed')
-        .query(`
-            INSERT INTO dbo.BORROW_RECORD (user_id, res_id, borrow_date, return_date, status)
-            VALUES (@UserID, @ResID, GETDATE(), DATEADD(DAY, 7, GETDATE()), @Status)
-        `);
-
-    await pool.request()
-        .input('ResID', sql.Int, res_id)
-        .query(`
-            UPDATE dbo.RESOURCE
-            SET availability = 'Unavailable'
-            WHERE res_id = @ResID
-        `);
-
-    await pool.request()
-        .input('UserID', sql.Int, user_id)
-        .input('Action', sql.NVarChar, `Borrowed ${resource.title}`)
-        .query(`
-            INSERT INTO dbo.SYSTEM_LOG (user_id, action, [timestamp])
-            VALUES (@UserID, @Action, GETDATE())
-        `);
+    await prisma.resource.update({ where: { res_id: rid }, data: { availability: 'Unavailable' } });
+    await prisma.systemLog.create({ data: { user_id: uid, action: 'Borrowed ' + resource.title } });
 };
 
 const returnResource = async ({ user_id, res_id }) => {
-    const pool = await poolPromise;
+    const uid = Number(user_id);
+    const rid = Number(res_id);
 
-    const borrowResult = await pool.request()
-        .input('UserID', sql.Int, user_id)
-        .input('ResID', sql.Int, res_id)
-        .query(`
-            SELECT TOP 1 borrow_id
-            FROM dbo.BORROW_RECORD
-            WHERE user_id = @UserID AND res_id = @ResID AND status = 'Borrowed'
-            ORDER BY borrow_date DESC
-        `);
+    const borrow = await prisma.borrowRecord.findFirst({
+        where: { user_id: uid, res_id: rid, status: 'Borrowed' },
+        orderBy: { borrow_date: 'desc' }
+    });
+    if (!borrow) throw new Error('No active borrow record found for this user and resource');
 
-    if (!borrowResult.recordset.length) {
-        throw new Error('No active borrow record found for this user and resource');
-    }
+    await prisma.borrowRecord.update({
+        where: { borrow_id: borrow.borrow_id },
+        data: { status: 'Returned', return_date: new Date() }
+    });
 
-    await pool.request()
-        .input('BorrowID', sql.Int, borrowResult.recordset[0].borrow_id)
-        .query(`
-            UPDATE dbo.BORROW_RECORD
-            SET status = 'Returned',
-                return_date = GETDATE()
-            WHERE borrow_id = @BorrowID
-        `);
+    await prisma.resource.update({ where: { res_id: rid }, data: { availability: 'Available' } });
 
-    await pool.request()
-        .input('ResID', sql.Int, res_id)
-        .query(`
-            UPDATE dbo.RESOURCE
-            SET availability = 'Available'
-            WHERE res_id = @ResID
-        `);
-
-    const resourceResult = await pool.request()
-        .input('ResID', sql.Int, res_id)
-        .query(`
-            SELECT title
-            FROM dbo.RESOURCE
-            WHERE res_id = @ResID
-        `);
-
-    const title = resourceResult.recordset[0]?.title || `resource #${res_id}`;
-
-    await pool.request()
-        .input('UserID', sql.Int, user_id)
-        .input('Action', sql.NVarChar, `Returned ${title}`)
-        .query(`
-            INSERT INTO dbo.SYSTEM_LOG (user_id, action, [timestamp])
-            VALUES (@UserID, @Action, GETDATE())
-        `);
+    const resource = await prisma.resource.findUnique({ where: { res_id: rid } });
+    const title = resource ? resource.title : 'resource #' + rid;
+    await prisma.systemLog.create({ data: { user_id: uid, action: 'Returned ' + title } });
 };
 
 module.exports = {
-    addResource,
-    getResources,
-    updateResource,
-    deleteResource,
-    addCategory,
-    getCategories,
-    updateCategory,
-    deleteCategory,
-    addBookmark,
-    getBookmarks,
-    deleteBookmark,
-    borrowResource,
-    returnResource
+    addResource, getResources, updateResource, deleteResource,
+    addCategory, getCategories, updateCategory, deleteCategory,
+    addBookmark, getBookmarks, deleteBookmark,
+    borrowResource, returnResource
 };

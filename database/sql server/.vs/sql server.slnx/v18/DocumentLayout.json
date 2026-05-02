@@ -3,16 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\NoOne\\Documents\\PG\\Digital library management\\database\\sql server\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{F78D8377-F263-781D-B6E6-6F9B23160E3D}|sql server.ssmssqlproj|C:\\Users\\NoOne\\Documents\\PG\\Digital library management\\database\\sql server\\debug.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{F78D8377-F263-781D-B6E6-6F9B23160E3D}|sql server.ssmssqlproj|solutionrelative:debug.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{F78D8377-F263-781D-B6E6-6F9B23160E3D}|sql server.ssmssqlproj|C:\\Users\\NoOne\\Documents\\PG\\Digital library management\\database\\sql server\\DigitalLibraryDB.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
       "RelativeMoniker": "D:0:0:{F78D8377-F263-781D-B6E6-6F9B23160E3D}|sql server.ssmssqlproj|solutionrelative:DigitalLibraryDB.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{F78D8377-F263-781D-B6E6-6F9B23160E3D}|sql server.ssmssqlproj|C:\\Users\\NoOne\\Documents\\PG\\Digital library management\\database\\sql server\\DELETEALL.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{F78D8377-F263-781D-B6E6-6F9B23160E3D}|sql server.ssmssqlproj|solutionrelative:DELETEALL.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
     }
   ],
   "DocumentGroupContainers": [
@@ -22,40 +14,18 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "DigitalLibraryDB.sql - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (57))",
+              "DocumentIndex": 0,
+              "Title": "DigitalLibraryDB.sql - DESKTOP-KTJAK72\\SQLEXPRESS.master (DESKTOP-KTJAK72\\NoOne (53))",
               "DocumentMoniker": "C:\\Users\\NoOne\\Documents\\PG\\Digital library management\\database\\sql server\\DigitalLibraryDB.sql",
               "RelativeDocumentMoniker": "DigitalLibraryDB.sql",
-              "ToolTip": "DigitalLibraryDB.sql - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (57))",
+              "ToolTip": "DigitalLibraryDB.sql - DESKTOP-KTJAK72\\SQLEXPRESS.master (DESKTOP-KTJAK72\\NoOne (53))",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2026-03-19T03:29:44.143Z",
-              "EditorCaption": " - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (57))"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "DELETEALL.sql - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (82))",
-              "DocumentMoniker": "C:\\Users\\NoOne\\Documents\\PG\\Digital library management\\database\\sql server\\DELETEALL.sql",
-              "RelativeDocumentMoniker": "DELETEALL.sql",
-              "ToolTip": "DELETEALL.sql - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (82))",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2026-03-19T06:07:47.413Z",
-              "EditorCaption": " - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (82))"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "debug.sql - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (83))",
-              "DocumentMoniker": "C:\\Users\\NoOne\\Documents\\PG\\Digital library management\\database\\sql server\\debug.sql",
-              "RelativeDocumentMoniker": "debug.sql",
-              "ToolTip": "debug.sql - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (83))",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2026-03-19T03:30:41.695Z",
-              "EditorCaption": " - DESKTOP-KTJAK72\\SQLEXPRESS.DigitalLibraryDB (DESKTOP-KTJAK72\\NoOne (83))"
+              "WhenOpened": "2026-05-01T13:25:20.925Z",
+              "EditorCaption": " - DESKTOP-KTJAK72\\SQLEXPRESS.master (DESKTOP-KTJAK72\\NoOne (53))"
             }
           ]
         }

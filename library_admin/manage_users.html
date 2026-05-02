@@ -84,7 +84,33 @@ text-align:center;
 <h1>Manage Users</h1>
 
 <button id="addUserBtn">Add User</button>
+<!-- User Modal -->
+<div id="userModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:white; border-radius:10px; padding:32px; width:420px; box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <h2 id="userModalTitle" style="margin-top:0;">Add User</h2>
+    <input type="hidden" id="editUserId" />
 
+    <label>Name</label><br/>
+    <input id="editNickname" type="text" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;" /><br/>
+
+    <label>Email</label><br/>
+    <input id="editEmail" type="email" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;" /><br/>
+
+    <label>Password</label><br/>
+    <input id="editPassword" type="password" style="width:100%; margin-bottom:12px; padding:8px; box-sizing:border-box;" /><br/>
+
+    <label>Role</label><br/>
+    <select id="editRole" style="width:100%; margin-bottom:20px; padding:8px; box-sizing:border-box;">
+      <option value="User">User</option>
+      <option value="Admin">Admin</option>
+    </select><br/>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <button id="userModalDiscardBtn" style="padding:10px 20px; background:#e9edf2; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Discard</button>
+      <button id="userModalSaveBtn" style="padding:10px 20px; background:#1f2d3d; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Save</button>
+    </div>
+  </div>
+</div>
 <div class="table">
 
 <table>
@@ -112,6 +138,24 @@ text-align:center;
 <script src="../frontend/auth-guard.js"></script>
 <script>
 const API_BASE = 'http://localhost:3000/api';
+	//Toast thông báo
+    function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position: fixed; bottom: 24px; right: 24px; padding: 14px 28px;
+      border-radius: 8px; color: white; font-weight: 600; z-index: 10000;
+      background: ${type === 'success' ? '#28a745' : '#dc3545'};
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      transition: opacity 0.4s;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 500);
+    }, 3200);
+  }
+
 const usersBody = document.getElementById('usersTableBody');
 const addUserBtn = document.getElementById('addUserBtn');
 
@@ -160,55 +204,81 @@ const loadUsers = () => {
 		});
 };
 
-const addUser = async () => {
-	const nickname = prompt('User name:');
-	if (!nickname) return;
-	const email = prompt('Email:');
-	if (!email) return;
-	const password = prompt('Password:');
-	if (!password) return;
-	const role = prompt('Role (Admin/User):', 'User') || 'User';
+const openAddUserModal = () => {
+  document.getElementById('userModalTitle').textContent = 'Add User';
+  document.getElementById('editUserId').value = '';
+  document.getElementById('editNickname').value = '';
+  document.getElementById('editEmail').value = '';
+  document.getElementById('editPassword').value = '';
+  document.getElementById('editRole').value = 'User';
+  document.getElementById('userModalSaveBtn').textContent = 'Add User';
 
-	const created = await request('/accounts', {
-		method: 'POST',
-		body: JSON.stringify({ nickname, email, password, role })
-	});
-
-	if (!created.success) {
-		alert(created.message || 'Failed to create user');
-		return;
-	}
-
-	loadUsers();
+  document.getElementById('userModal').style.display = 'flex';
 };
 
-const editUser = async (id) => {
-	const details = await request(`/accounts?user_id=${encodeURIComponent(id)}`);
-	if (!details.success || !details.user) {
-		alert(details.message || 'Failed to load user details');
-		return;
-	}
+const openEditUserModal = async (id) => {
+  const details = await request(`/accounts?user_id=${encodeURIComponent(id)}`);
+  if (!details.success || !details.user) {
+    showToast('Failed to load user details', 'error');
+    return;
+  }
 
-	const current = details.user;
-	const nickname = prompt('User name:', current.nickname || '');
-	if (!nickname) return;
-	const email = prompt('Email:', current.email || '');
-	if (!email) return;
-	const password = prompt('Password:', current.password || '');
-	if (!password) return;
-	const role = prompt('Role (Admin/User):', current.role || 'User') || current.role || 'User';
+  const current = details.user;
+  document.getElementById('userModalTitle').textContent = 'Edit User';
+  document.getElementById('editUserId').value = id;
+  document.getElementById('editNickname').value = current.nickname || '';
+  document.getElementById('editEmail').value = current.email || '';
+  document.getElementById('editPassword').value = '';
+  document.getElementById('editRole').value = current.role || 'User';
+  document.getElementById('userModalSaveBtn').textContent = 'Save Changes';
 
-	const updated = await request('/accounts', {
-		method: 'PUT',
-		body: JSON.stringify({ user_id: Number(id), nickname, email, password, role })
-	});
+  document.getElementById('userModal').style.display = 'flex';
+};
 
-	if (!updated.success) {
-		alert(updated.message || 'Failed to update user');
-		return;
-	}
+const handleUserModalSave = async () => {
+  const id = document.getElementById('editUserId').value;
+  const nickname = document.getElementById('editNickname').value.trim();
+  const email = document.getElementById('editEmail').value.trim();
+  const password = document.getElementById('editPassword').value.trim();
+  const role = document.getElementById('editRole').value;
 
-	loadUsers();
+  if (!nickname || !email || !password) {
+    showToast('Name, Email and Password are required', 'error');
+    return;
+  }
+
+  // Không có id → đang Add
+  if (!id) {
+    const created = await request('/accounts', {
+      method: 'POST',
+      body: JSON.stringify({ nickname, email, password, role })
+    });
+
+    if (!created.success) {
+      showToast('Failed to create user', 'error');
+      return;
+    }
+
+    document.getElementById('userModal').style.display = 'none';
+    showToast('User created successfully', 'success');
+    loadUsers();
+    return;
+  }
+
+  // Có id → đang Edit
+  const updated = await request('/accounts', {
+    method: 'PUT',
+    body: JSON.stringify({ user_id: Number(id), nickname, email, password, role })
+  });
+
+  if (!updated.success) {
+    showToast(updated.message || 'Failed to update user', 'error');
+    return;
+  }
+
+  document.getElementById('userModal').style.display = 'none';
+  showToast('User updated successfully', 'success');
+  loadUsers();
 };
 
 const deleteUser = async (id) => {
@@ -220,19 +290,24 @@ const deleteUser = async (id) => {
 	});
 
 	if (!deleted.success) {
-		alert(deleted.message || 'Failed to delete user');
+		//alert(deleted.message || 'Failed to delete user');
+		showToast('Failed to delete user', 'error');
 		return;
 	}
 
 	loadUsers();
 };
 
-addUserBtn.addEventListener('click', addUser);
+addUserBtn.addEventListener('click', openAddUserModal);
+document.getElementById('userModalSaveBtn').addEventListener('click', handleUserModalSave);
+document.getElementById('userModalDiscardBtn').addEventListener('click', () => {
+  document.getElementById('userModal').style.display = 'none';
+});
 
 usersBody.addEventListener('click', (event) => {
 	const editId = event.target.getAttribute('data-edit-id');
 	const deleteId = event.target.getAttribute('data-delete-id');
-	if (editId) editUser(editId);
+	if (editId) openEditUserModal(editId);
 	if (deleteId) deleteUser(deleteId);
 });
 

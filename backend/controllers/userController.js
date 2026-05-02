@@ -87,6 +87,30 @@ const createAccount = async (req, res) => {
     }
 };
 
+const register = async (req, res) => {
+    try {
+        const { nickname, email, password } = req.body;
+
+        if (!nickname || !email || !password) {
+            return res.status(400).json({ success: false, message: 'All fields are required' });
+        }
+
+        // Check for duplicate email
+        const existing = await userModel.getAccountByUsernameOrEmail(email);
+        if (existing) {
+            return res.status(409).json({ success: false, message: 'An account with this email already exists' });
+        }
+
+        await userModel.createAccount({ nickname, email, password, role: 'User' });
+
+        return res.status(201).json({ success: true, message: 'Account created successfully' });
+    }
+    catch (error) {
+        console.log(error);
+        return res.status(500).json({ message: 'Error', error: error.message });
+    }
+};
+
 const editAccount = async (req, res) => {
     try {
         await userModel.updateAccount(req.body);
@@ -137,6 +161,7 @@ module.exports = {
     login,
     getAccount,
     createAccount,
+    register,
     editAccount,
     deleteAccount,
     updateUserPref

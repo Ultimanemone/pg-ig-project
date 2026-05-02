@@ -1,119 +1,86 @@
-const { sql, poolPromise } = require('../../config');
+﻿const prisma = require('../prismaClient');
 
 const login = async ({ username, password }) => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .input('Username', sql.NVarChar, username)
-        .input('Password', sql.NVarChar, password)
-        .query(`
-            SELECT user_id, role, nickname, email
-            FROM dbo.[USER] 
-            WHERE (nickname = @Username OR email = @Username) AND [password] = @Password
-        `);
-
-    return result.recordset[0] || null;
+    const user = await prisma.user.findFirst({
+        where: {
+            AND: [
+                { OR: [{ nickname: username }, { email: username }] },
+                { password }
+            ]
+        },
+        select: { user_id: true, role: true, nickname: true, email: true }
+    });
+    return user || null;
 };
 
 const getAllAccounts = async () => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .query(`
-            SELECT user_id, nickname, email, role, creationDate FROM dbo.[USER] ORDER BY user_id
-        `);
-
-    return result.recordset;
+    return prisma.user.findMany({
+        select: { user_id: true, nickname: true, email: true, role: true, creationDate: true },
+        orderBy: { user_id: 'asc' }
+    });
 };
 
 const getAccountByUsernameOrEmail = async (username) => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .input('Username', sql.NVarChar, username)
-        .query(`
-            SELECT user_id, nickname, email, [password], role
-            FROM dbo.[USER]
-            WHERE nickname = @Username OR email = @Username
-        `);
-
-    return result.recordset[0] || null;
+    const user = await prisma.user.findFirst({
+        where: { OR: [{ nickname: username }, { email: username }] },
+        select: { user_id: true, nickname: true, email: true, password: true, role: true }
+    });
+    return user || null;
 };
 
 const getAccountById = async (userId) => {
-    const pool = await poolPromise;
-
-    const result = await pool.request()
-        .input('UserID', sql.Int, userId)
-        .query(`
-            SELECT user_id, nickname, email, password, role FROM dbo.[USER] WHERE user_id = @UserID
-        `);
-
-    return result.recordset[0] || null;
+    const user = await prisma.user.findUnique({
+        where: { user_id: Number(userId) },
+        select: { user_id: true, nickname: true, email: true, password: true, role: true }
+    });
+    return user || null;
 };
 
 const createAccount = async ({ nickname, email, password, role }) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('Nickname', sql.NVarChar, nickname)
-        .input('Email', sql.NVarChar, email)
-        .input('Password', sql.NVarChar, password)
-        .input('Role', sql.NVarChar, role)
-        .query(`
-            INSERT INTO dbo.[USER] (nickname, email, password, role) VALUES (@Nickname, @Email, @Password, @Role)
-        `);
+    await prisma.user.create({ data: { nickname, email, password, role } });
 };
 
 const updateAccount = async ({ user_id, nickname, email, password, role }) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('UserID', sql.Int, user_id)
-        .input('Nickname', sql.NVarChar, nickname)
-        .input('Email', sql.NVarChar, email)
-        .input('Password', sql.NVarChar, password)
-        .input('Role', sql.NVarChar, role)
-        .query(`
-            UPDATE dbo.[USER] SET nickname = @Nickname, email = @Email, password = @Password, role = @Role WHERE user_id = @UserID
-        `);
+    await prisma.user.update({
+        where: { user_id: Number(user_id) },
+        data: { nickname, email, password, role }
+    });
 };
 
 const deleteAccount = async (userId) => {
-    const pool = await poolPromise;
-
-    await pool.request()
-        .input('UserID', sql.Int, userId)
-        .query(`
-            DELETE FROM dbo.[USER] WHERE user_id = @UserID
-        `);
+    await prisma.user.delete({ where: { user_id: Number(userId) } });
 };
 
 const updateUserPreference = async ({ user_id, category, countChange, lastread }) => {
-    const pool = await poolPromise;
+    const uid = Number(user_id);
+    const existing = await prisma.userPreference.findUnique({ where: { user_id: uid } });
 
-    await pool.request()
-        .input('UserID', sql.Int, user_id)
-        .input('Category', sql.NVarChar, category)
-        .input('CountChange', sql.Int, countChange)
-        .input('LastRead', sql.DateTime, lastread)
-        .query(`
-            IF EXISTS (SELECT category FROM dbo.USERPREFERENCE WHERE category = @Category AND user_id = @UserID)
-            BEGIN
-                IF EXISTS (SELECT category FROM dbo.USERPREFERENCE WHERE category = @Category AND user_id = @UserID AND count + @CountChange <= 0)
-                BEGIN
-                    DELETE FROM dbo.USERPREFERENCE WHERE category = @Category AND user_id = @UserID
-                END
-                ELSE
-                BEGIN
-                    UPDATE dbo.USERPREFERENCE SET category = @Category, count = count + @CountChange, lastread = @LastRead WHERE user_id = @UserID
-                END
-            END
-            ELSE
-            BEGIN
-                INSERT INTO dbo.USERPREFERENCE (user_id, category, count, lastread) VALUES (@UserID, @Category, @CountChange, @LastRead)
-            END
-        `);
+    if (existing) {
+        const newCount = existing.count + countChange;
+        if (newCount <= 0) {
+            await prisma.userPreference.delete({ where: { user_id: uid } });
+        } else {
+            await prisma.userPreference.update({
+                where: { user_id: uid },
+                data: { category, count: newCount, lastRead: lastread ? new Date(lastread) : new Date() }
+            });
+        }
+    } else {
+        await prisma.userPreference.create({
+            data: { user_id: uid, category, count: countChange, lastRead: lastread ? new Date(lastread) : new Date() }
+        });
+    }
+};
+
+module.exports = {
+    login,
+    getAllAccounts,
+    getAccountByUsernameOrEmail,
+    getAccountById,
+    createAccount,
+    updateAccount,
+    deleteAccount,
+    updateUserPreference
 };
 
 module.exports = {
